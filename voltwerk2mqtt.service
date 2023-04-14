@@ -5,7 +5,7 @@ After=network-online.target
 
 [Service]
 Type=simple
-ExecStartPre=ip link set can0 up type can bitrate 125000
+ExecStartPre=-ip link set can0 up type can bitrate 125000
 ExecStart=/usr/bin/python3 /opt/voltwerk2mqtt/voltwerk2mqtt.py
 Restart=on-failure
 RestartSec=5
