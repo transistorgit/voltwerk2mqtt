@@ -7,6 +7,7 @@ ip link set can0 up type can bitrate 125000
 import can
 import sys, os
 import logging
+from logging.handlers import RotatingFileHandler
 from time import sleep
 import paho.mqtt.client as mqtt
 
@@ -17,6 +18,7 @@ Topics = {
     'voltage':'iot/pv/voltwerk/ac_voltage_V',
     'power':'iot/pv/voltwerk/ac_active_power_kW',
     'freq':'iot/pv/voltwerk/grid_frequency_Hz',
+    'status':'iot/pv/voltwerk/service',
     }
 Subscriptions = {}
 
@@ -36,20 +38,18 @@ def on_disconnect(client, userdata, rc):
     print('Unexpected MQTT disconnect. Will auto-reconnect')
   try:
     client.connect(Broker_Address)
-    is_connected = True
   except Exception as e:
     logging.error("Failed to Reconnect to " + Broker_Address + " " + str(e))
     print("Failed to Reconnect to " + Broker_Address + " " + str(e))
-    is_connected = False
 
 
 def on_connect(client, userdata, flags, rc):
   if rc == 0:
     logging.info("Connected to MQTT Broker " + Broker_Address)
-    is_connected = True
     for topic in Subscriptions.values():
       print("subcribe to " + topic)
       client.subscribe(topic)
+    client.publish(Topics['status'], 'online')
   else:
     logging.error("Failed to connect, return code %d\n", rc)
 
@@ -67,58 +67,62 @@ client = mqtt.Client('Voltwerk2Mqtt')
 client.on_disconnect = on_disconnect
 client.on_connect = on_connect
 client.on_message = on_message
-client.connect(Broker_Address)  # connect to broker
+try:
+  client.connect(Broker_Address)  # connect to broker
+  client.will_set(Topics['status'], 'offline', qos=1, retain=True)
 
-client.loop_start()
+  client.loop_start()
 
-logging.basicConfig(format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+  logging.basicConfig(format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S',
                     level=logging.INFO,
                     handlers=[
-                        logging.FileHandler(
-                            "%s/current.log" % (os.path.dirname(os.path.realpath(__file__)))),
+                        RotatingFileHandler("/opt/voltwerk2mqtt/log", maxBytes=100000, backupCount=2),
                         logging.StreamHandler()
                     ])
 
-logging.info("Start Voltwerk2MQTT service")
+  logging.info("Start Voltwerk2MQTT service")
 
-with can.Bus() as bus:
-  while True:
+  with can.Bus() as bus:
+    while True:
 
-    bus.send(requests[request_count])
-    request_count = (request_count + 1) % len(requests)
+      bus.send(requests[request_count])
+      request_count = (request_count + 1) % len(requests)
 
-    for msg in bus:
-      if msg.arbitration_id == 0x0f0a4082:
-        multiplier = 4
-        topic = 'power'
-      elif msg.arbitration_id == 0x0f0a0082:
-        multiplier = 16
-        topic = 'current'
-      elif msg.arbitration_id == 0x0f09c082:
-        multiplier = 256
-        topic = 'voltage'
-      elif msg.arbitration_id == 0x0f090082:
-        multiplier = 64
-        topic = 'freq'
+      for msg in bus:
+        if msg.arbitration_id == 0x0f0a4082:
+          multiplier = 4
+          topic = 'power'
+        elif msg.arbitration_id == 0x0f0a0082:
+          multiplier = 16
+          topic = 'current'
+        elif msg.arbitration_id == 0x0f09c082:
+          multiplier = 256
+          topic = 'voltage'
+        elif msg.arbitration_id == 0x0f090082:
+          multiplier = 64
+          topic = 'freq'
 
-      data = bytearray(msg.data)
+        data = bytearray(msg.data)
 
-      # to little endian
-      data[0], data[1] = data[1], data[0]
+        # to little endian
+        data[0], data[1] = data[1], data[0]
 
-      dataBin = data[0]<<8 | data[1]
+        dataBin = data[0]<<8 | data[1]
 
-      if dataBin&0x8000>0:
-        dataBin = ((~dataBin) & 0x7fff) + 1
-        data = -(dataBin/0x2000) * multiplier
-      else:
-        dataBin = dataBin & 0x7fff
-        data = (dataBin/0x2000) * multiplier
+        if dataBin&0x8000>0:
+          dataBin = ((~dataBin) & 0x7fff) + 1
+          data = -(dataBin/0x2000) * multiplier
+        else:
+          dataBin = dataBin & 0x7fff
+          data = (dataBin/0x2000) * multiplier
 
-      client.publish(Topics[topic],f'{data}')
-      sleep(0.25)
-      break
+        client.publish(Topics[topic],f'{data}')
+        sleep(0.25)
+        break
+finally:
+  client.connect(Broker_Address)
+  client.publish(Topics['status'], 'offline')
 
 
 
