@@ -13,10 +13,10 @@ import paho.mqtt.client as mqtt
 Broker_Address = '192.168.168.112'
 Mqtt_Prefix = 'iot/pv/voltwerk'
 Topics = { 
-    'current':'iot/pv/voltwerk/current_Arms',
-    'voltage':'iot/pv/voltwerk/voltage_V',
-    'power':'iot/pv/voltwerk/power_W',
-    'freq':'iot/pv/voltwerk/frequency_Hz',
+    'current':'iot/pv/voltwerk/ac_current_A',
+    'voltage':'iot/pv/voltwerk/ac_voltage_V',
+    'power':'iot/pv/voltwerk/ac_active_power_kW',
+    'freq':'iot/pv/voltwerk/grid_frequency_Hz',
     }
 Subscriptions = {}
 
@@ -89,97 +89,36 @@ with can.Bus() as bus:
     request_count = (request_count + 1) % len(requests)
 
     for msg in bus:
-      #print(f'Header: {msg.arbitration_id:0x} DLC: {msg.dlc} Data: {bytes(msg.data).hex()}')
-
-      # answer for get power reg 41: 0x7e0451 > 0.561523kW
       if msg.arbitration_id == 0x0f0a4082:
-        #print("Power received")
-
         multiplier = 4
-        data = bytearray(msg.data)
+        topic = 'power'
+      elif msg.arbitration_id == 0x0f0a0082:
+        multiplier = 16
+        topic = 'current'
+      elif msg.arbitration_id == 0x0f09c082:
+        multiplier = 256
+        topic = 'voltage'
+      elif msg.arbitration_id == 0x0f090082:
+        multiplier = 64
+        topic = 'freq'
 
-        # to little endian
-        data[0], data[1] = data[1], data[0]
+      data = bytearray(msg.data)
 
-        dataBin = data[0]<<8 | data[1]
+      # to little endian
+      data[0], data[1] = data[1], data[0]
 
-        if dataBin&0x8000>0:
-            dataBin=((~dataBin)&0x7fff)+1
-            data = -(dataBin/0x2000) * multiplier
-        else:
-            dataBin = dataBin & 0x7fff
-            data = (dataBin/0x2000)*multiplier
+      dataBin = data[0]<<8 | data[1]
 
-        print(f'AC Power {data:2.2f}kW')
-        client.publish(Topics['power'],f'{data:1.3f}')
+      if dataBin&0x8000>0:
+        dataBin = ((~dataBin) & 0x7fff) + 1
+        data = -(dataBin/0x2000) * multiplier
+      else:
+        dataBin = dataBin & 0x7fff
+        data = (dataBin/0x2000) * multiplier
 
-      # answer for get currents reg 40: 0xa7 - 0x04 - 0x52 > 2.32617A 
-      if msg.arbitration_id == 0x0f0a0082:
-        #print("Current received")
-
-        multiplier = 16      
-        data = bytearray(msg.data)
-
-        # to little endian
-        data[0], data[1] = data[1], data[0]
-
-        dataBin = data[0]<<8 | data[1]
-
-        if dataBin&0x8000>0:    
-            dataBin=((~dataBin)&0x7fff)+1
-            data=-(dataBin/0x2000)*multiplier 
-        else:
-            dataBin = dataBin & 0x7fff
-            data = (dataBin/0x2000)*multiplier
-
-        print(f'AC Current {data:2.1f}A')
-
-      # answer for get voltage reg 39: 0xbf - 0x1d - 0x54 > 237.969V 
-      if msg.arbitration_id == 0x0f09c082:
-        #print("Voltage received")
-
-        multiplier = 256      
-        data = bytearray(msg.data)
-
-        # to little endian
-        data[0], data[1] = data[1], data[0]
-
-        dataBin = data[0]<<8 | data[1]
-
-        if dataBin&0x8000>0:    
-            dataBin=((~dataBin)&0x7fff)+1
-            data=-(dataBin/0x2000)*multiplier 
-        else:
-            dataBin = dataBin & 0x7fff
-            data = (dataBin/0x2000)*multiplier
-
-        print(f'AC Voltage {data:3.0f}V')
-
-
-      # answer for get freq reg 36: 
-      if msg.arbitration_id == 0x0f090082:
-        #print("Frequency received")
-
-        multiplier = 64      
-        data = bytearray(msg.data)
-
-        # to little endian
-        data[0], data[1] = data[1], data[0]
-
-        dataBin = data[0]<<8 | data[1]
-
-        if dataBin&0x8000>0:    
-            dataBin=((~dataBin)&0x7fff)+1
-            data=-(dataBin/0x2000)*multiplier 
-        else:
-            dataBin = dataBin & 0x7fff
-            data = (dataBin/0x2000)*multiplier
-
-        print(f'AC Frequency {data:2.2f}Hz')
-      
-      sleep(1)
+      client.publish(Topics[topic],f'{data}')
+      sleep(0.25)
       break
 
-sys.exit(1)
 
 
