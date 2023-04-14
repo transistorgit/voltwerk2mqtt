@@ -10,6 +10,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from time import sleep
 import paho.mqtt.client as mqtt
+from signal import *
 
 Broker_Address = '192.168.168.112'
 Mqtt_Prefix = 'iot/pv/voltwerk'
@@ -21,7 +22,6 @@ Topics = {
     'status':'iot/pv/voltwerk/service',
     }
 Subscriptions = {}
-
 
 bus = can.interface.Bus()
 
@@ -67,7 +67,18 @@ client = mqtt.Client('Voltwerk2Mqtt')
 client.on_disconnect = on_disconnect
 client.on_connect = on_connect
 client.on_message = on_message
+
+def go_offline(*args):
+  client.publish(Topics['status'], 'offline')
+  client.disconnect()
+  logging.info("Disconnect")
+  sys.exit(0)
+
+
 try:
+  for sig in (SIGABRT, SIGINT, SIGTERM):
+    signal(sig, go_offline)
+
   client.connect(Broker_Address)  # connect to broker
   client.will_set(Topics['status'], 'offline', qos=1, retain=True)
 
@@ -103,8 +114,11 @@ try:
           multiplier = 64
           topic = 'freq'
 
-        data = bytearray(msg.data)
+        if len(msg.data) < 2:
+          sleep(0.25)
+          break
 
+        data = bytearray(msg.data)
         # to little endian
         data[0], data[1] = data[1], data[0]
 
@@ -120,8 +134,10 @@ try:
         client.publish(Topics[topic],f'{data}')
         sleep(0.25)
         break
+except Exception as e:
+  logging.error("Error: ", exc_info=e)
+  sys.exit(1)
 finally:
-  client.connect(Broker_Address)
   client.publish(Topics['status'], 'offline')
 
 
