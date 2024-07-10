@@ -1,6 +1,6 @@
 # voltwerk2mqtt
 
-pick up power generation data from voltwerk/conergy string inverters and publish to mqtt
+pick up power generation data from a voltwerk/suntechnics/conergy string inverter and publish to mqtt
 
 This is written for my single phase VS5 (same as Conergy IPG 5S)
 
@@ -12,15 +12,9 @@ This is no real protocol implementation, just fumbled out from capturing monitor
 
 ## Install 
 
-I use this on a small linux box. Orange Pi Zero in my case, but any beagle bone, raspberry etc will do.
+I used a linux SBC to host this script as a service. Any raspi, beagle bone, orange pi will work. You need a socket CAN supported CAN interface, of course.
 
-As can interface I used a peak can usb dongle that I had laying around. Any other OS supported device will do. For peak, activate driver with 
-```
-sudo modprobe peak_usb
-echo peak_usb >>/etc/modules
-```
-
-copy all files to /opt/voltwerk2mqtt/
+copy all files to /opt/voltwerk2mqtt
 
 then copy the service file to lib folder and activate service like so:
 ```
