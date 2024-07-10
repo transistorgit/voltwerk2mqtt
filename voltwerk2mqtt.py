@@ -96,10 +96,13 @@ try:
 
   with can.Bus() as bus:
     while True:
+      sleep(0.25)
 
       bus.send(requests[request_count])
       request_count = (request_count + 1) % len(requests)
 
+      multiplier = 1
+      topic = ''
       for msg in bus:
         if msg.arbitration_id == 0x0f0a4082:
           multiplier = 4
@@ -114,8 +117,7 @@ try:
           multiplier = 64
           topic = 'freq'
 
-        if len(msg.data) < 2:
-          sleep(0.25)
+        if len(topic)==0 or len(msg.data)<2:
           break
 
         data = bytearray(msg.data)
@@ -132,13 +134,12 @@ try:
           data = (dataBin/0x2000) * multiplier
 
         client.publish(Topics[topic],f'{data}')
-        sleep(0.25)
         break
 except Exception as e:
   logging.error("Error: ", exc_info=e)
-  sys.exit(1)
 finally:
   client.publish(Topics['status'], 'offline')
+  sys.exit(1)
 
 
 
