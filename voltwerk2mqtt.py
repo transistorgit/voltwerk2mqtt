@@ -14,7 +14,7 @@ from signal import *
 
 Broker_Address = '192.168.168.112'
 Mqtt_Prefix = 'iot/pv/voltwerk'
-Topics = { 
+Topics = {
     'current':'iot/pv/voltwerk/ac_current_A',
     'voltage':'iot/pv/voltwerk/ac_voltage_V',
     'power':'iot/pv/voltwerk/ac_active_power_kW',
@@ -33,14 +33,16 @@ requests = [can.Message(arbitration_id=0x0f89c101, dlc=1, data=[0x20]),
 request_count = 0
 
 def on_disconnect(client, userdata, rc):
-  print("mqtt disconnected")
+  logging.info("MQTT disconnected")
   if rc != 0:
+    logging.error(f"Unexpected MQTT disconnect rc={rc}. Will auto-reconnect")
     print('Unexpected MQTT disconnect. Will auto-reconnect')
   try:
     client.connect(Broker_Address)
   except Exception as e:
     logging.error("Failed to Reconnect to " + Broker_Address + " " + str(e))
     print("Failed to Reconnect to " + Broker_Address + " " + str(e))
+    sys.exit(2)
 
 
 def on_connect(client, userdata, flags, rc):
@@ -52,6 +54,7 @@ def on_connect(client, userdata, flags, rc):
     client.publish(Topics['status'], 'online')
   else:
     logging.error("Failed to connect, return code %d\n", rc)
+    sys.exit(3)
 
 
 def on_message(client, userdata, msg):
@@ -63,7 +66,7 @@ def on_message(client, userdata, msg):
     print(e)
 
 
-client = mqtt.Client('Voltwerk2Mqtt') 
+client = mqtt.Client('Voltwerk2Mqtt')
 client.on_disconnect = on_disconnect
 client.on_connect = on_connect
 client.on_message = on_message
@@ -79,11 +82,6 @@ try:
   for sig in (SIGABRT, SIGINT, SIGTERM):
     signal(sig, go_offline)
 
-  client.connect(Broker_Address)  # connect to broker
-  client.will_set(Topics['status'], 'offline', qos=1, retain=True)
-
-  client.loop_start()
-
   logging.basicConfig(format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S',
                     level=logging.INFO,
@@ -91,6 +89,12 @@ try:
                         RotatingFileHandler("/opt/voltwerk2mqtt/log", maxBytes=100000, backupCount=2),
                         logging.StreamHandler()
                     ])
+
+  client.connect(Broker_Address)  # connect to broker
+  client.will_set(Topics['status'], 'offline', qos=1, retain=True)
+
+  client.loop_start()
+
 
   logging.info("Start Voltwerk2MQTT service")
 
