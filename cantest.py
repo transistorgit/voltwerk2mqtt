@@ -3,8 +3,6 @@ import can
 import sys
 from time import sleep
 
-bus = can.interface.Bus()
-
 requests = [can.Message(arbitration_id=0x0f89c101, dlc=1, data=[0x20]),
             can.Message(arbitration_id=0x0f8a0101, dlc=1, data=[0x20]),
             can.Message(arbitration_id=0x0f8a4101, dlc=1, data=[0x20]),
@@ -12,7 +10,7 @@ requests = [can.Message(arbitration_id=0x0f89c101, dlc=1, data=[0x20]),
 
 request_count = 0
 
-with can.Bus() as bus:
+with can.interface.Bus(channel='can0', interface="socketcan", bitrate=125000) as bus:
   while True:
 
     bus.send(requests[request_count])
