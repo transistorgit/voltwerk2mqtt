@@ -17,6 +17,7 @@ I used a linux SBC to host this script as a service. Any raspi, beagle bone, ora
 ### Prerequisites
 ```
 sudo apt install python3-can
+sudo apt install python3-paho-mqtt
 ```
 
 ### script install
