@@ -12,7 +12,7 @@ from time import sleep
 import paho.mqtt.client as mqtt
 from signal import *
 
-Broker_Address = '192.168.168.112'
+Broker_Address = '192.168.168.112'  # change to your own broker ip or url
 Mqtt_Prefix = 'iot/pv/voltwerk'
 Topics = {
     'current':'iot/pv/voltwerk/ac_current_A',
