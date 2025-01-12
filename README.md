@@ -12,9 +12,15 @@ This is no real protocol implementation, just fumbled out from capturing monitor
 
 ## Install 
 
-I used a linux SBC to host this script as a service. Any raspi, beagle bone, orange pi will work. You need a socket CAN supported CAN interface, of course.
+I used a linux SBC to host this script as a service. Any raspi, beagle bone, orange pi will work. You need a socket CAN supported hardware CAN interface, of course.
 
-copy all files to /opt/voltwerk2mqtt
+### Prerequisites
+```
+sudo apt install python3-can
+```
+
+### script install
+copy all files from this repo to a new folder /opt/voltwerk2mqtt
 
 then copy the service file to lib folder and activate service like so:
 ```
