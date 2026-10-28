@@ -12,7 +12,7 @@ from time import sleep
 import paho.mqtt.client as mqtt
 from signal import *
 
-Broker_Address = '192.168.168.112'  # change to your own broker ip or url
+Broker_Address = '192.168.168.112' # insert your own broker here
 Mqtt_Prefix = 'iot/pv/voltwerk'
 Topics = {
     'current':'iot/pv/voltwerk/ac_current_A',
@@ -23,17 +23,17 @@ Topics = {
     }
 Subscriptions = {}
 
-requests = [can.Message(arbitration_id=0x0f89c101, dlc=1, data=[0x20]),
-            can.Message(arbitration_id=0x0f8a0101, dlc=1, data=[0x20]),
-            can.Message(arbitration_id=0x0f8a4101, dlc=1, data=[0x20]),
-            can.Message(arbitration_id=0x0f890101, dlc=1, data=[0x20])]
+requests = [can.Message(arbitration_id=0x0f89c181, dlc=1, data=[0x20]),
+            can.Message(arbitration_id=0x0f8a0181, dlc=1, data=[0x20]),
+            can.Message(arbitration_id=0x0f8a4181, dlc=1, data=[0x20]),
+            can.Message(arbitration_id=0x0f890181, dlc=1, data=[0x20])]
 
 request_count = 0
 
-def on_disconnect(client, userdata, rc):
+def on_disconnect(client, userdata, reasonCode, properties=None):
   logging.info("MQTT disconnected")
-  if rc != 0:
-    logging.error(f"Unexpected MQTT disconnect rc={rc}. Will auto-reconnect")
+  if reasonCode != 0:
+    logging.error(f"Unexpected MQTT disconnect rc={reasonCode}. Will auto-reconnect")
     print('Unexpected MQTT disconnect. Will auto-reconnect')
   try:
     client.connect(Broker_Address)
@@ -43,15 +43,15 @@ def on_disconnect(client, userdata, rc):
     sys.exit(2)
 
 
-def on_connect(client, userdata, flags, rc):
-  if rc == 0:
+def on_connect(client, userdata, flags, reasonCode, properties=None):
+  if reasonCode == 0:
     logging.info("Connected to MQTT Broker " + Broker_Address)
     for topic in Subscriptions.values():
       print("subcribe to " + topic)
       client.subscribe(topic)
     client.publish(Topics['status'], 'online')
   else:
-    logging.error("Failed to connect, return code %d\n", rc)
+    logging.error("Failed to connect, return code %d\n", reasonCode)
     sys.exit(3)
 
 
@@ -64,7 +64,7 @@ def on_message(client, userdata, msg):
     print(e)
 
 
-client = mqtt.Client('Voltwerk2Mqtt')
+client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, 'Voltwerk2Mqtt')
 client.on_disconnect = on_disconnect
 client.on_connect = on_connect
 client.on_message = on_message
@@ -106,16 +106,16 @@ try:
       multiplier = 1
       topic = ''
       for msg in bus:
-        if msg.arbitration_id == 0x0f0a4082:
+        if msg.arbitration_id == 0x0f0a4083:
           multiplier = 4
           topic = 'power'
-        elif msg.arbitration_id == 0x0f0a0082:
+        elif msg.arbitration_id == 0x0f0a0083:
           multiplier = 16
           topic = 'current'
-        elif msg.arbitration_id == 0x0f09c082:
+        elif msg.arbitration_id == 0x0f09c083:
           multiplier = 256
           topic = 'voltage'
-        elif msg.arbitration_id == 0x0f090082:
+        elif msg.arbitration_id == 0x0f090083:
           multiplier = 64
           topic = 'freq'
 

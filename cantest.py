@@ -17,7 +17,7 @@ with can.interface.Bus(channel='can0', interface="socketcan", bitrate=125000) as
     request_count = (request_count + 1) % len(requests)
 
     for msg in bus:
-      #print(f'Header: {msg.arbitration_id:0x} DLC: {msg.dlc} Data: {bytes(msg.data).hex()}')
+      print(f'Header: {msg.arbitration_id:0x} DLC: {msg.dlc} Data: {bytes(msg.data).hex()}')
 
       # answer for get power reg 41: 0x7e0451 > 0.561523kW
       if msg.arbitration_id == 0x0f0a4082:
