@@ -30,17 +30,13 @@ requests = [can.Message(arbitration_id=0x0f89c181, dlc=1, data=[0x20]),
 
 request_count = 0
 
-def on_disconnect(client, userdata, reasonCode, properties=None):
+def on_disconnect(client, userdata, flags, reasonCode, properties=None):
+  # paho >= 2.0 (CallbackAPIVersion.VERSION2) passes disconnect flags as 3rd argument.
+  # Reconnecting is done by the loop_start() thread itself.
   logging.info("MQTT disconnected")
   if reasonCode != 0:
     logging.error(f"Unexpected MQTT disconnect rc={reasonCode}. Will auto-reconnect")
     print('Unexpected MQTT disconnect. Will auto-reconnect')
-  try:
-    client.connect(Broker_Address)
-  except Exception as e:
-    logging.error("Failed to Reconnect to " + Broker_Address + " " + str(e))
-    print("Failed to Reconnect to " + Broker_Address + " " + str(e))
-    sys.exit(2)
 
 
 def on_connect(client, userdata, flags, reasonCode, properties=None):
@@ -49,7 +45,7 @@ def on_connect(client, userdata, flags, reasonCode, properties=None):
     for topic in Subscriptions.values():
       print("subcribe to " + topic)
       client.subscribe(topic)
-    client.publish(Topics['status'], 'online')
+    client.publish(Topics['status'], 'online', qos=1, retain=True)
   else:
     logging.error("Failed to connect, return code %d\n", reasonCode)
     sys.exit(3)
@@ -70,7 +66,7 @@ client.on_connect = on_connect
 client.on_message = on_message
 
 def go_offline(*args):
-  client.publish(Topics['status'], 'offline')
+  client.publish(Topics['status'], 'offline', qos=1, retain=True)
   client.disconnect()
   logging.info("Disconnect")
   sys.exit(0)
@@ -88,8 +84,8 @@ try:
                         logging.StreamHandler()
                     ])
 
+  client.will_set(Topics['status'], 'offline', qos=1, retain=True)  # must be set before connect
   client.connect(Broker_Address)  # connect to broker
-  client.will_set(Topics['status'], 'offline', qos=1, retain=True)
 
   client.loop_start()
 
@@ -140,7 +136,7 @@ try:
 except Exception as e:
   logging.error("Error: ", exc_info=e)
 finally:
-  client.publish(Topics['status'], 'offline')
+  client.publish(Topics['status'], 'offline', qos=1, retain=True)
   sys.exit(1)
 
 
