@@ -93,46 +93,63 @@ try:
   logging.info("Start Voltwerk2MQTT service")
 
   with can.interface.Bus(channel='can0', interface="socketcan", bitrate=125000) as bus:
+    send_failed = False
     while True:
       sleep(0.25)
 
-      bus.send(requests[request_count])
+      try:
+        bus.send(requests[request_count])
+      except can.CanOperationError as e:
+        # every CAN frame needs an acknowledge from another node. When the inverter is off (dark)
+        # and no other device is on the bus, frames are repeated forever and the tx queue runs full.
+        if not send_failed:
+          logging.warning("CAN send failed (inverter offline?): " + str(e))
+          send_failed = True
+        sleep(5)
+        continue
+      if send_failed:
+        logging.info("CAN send works again")
+        send_failed = False
       request_count = (request_count + 1) % len(requests)
 
       multiplier = 1
       topic = ''
-      for msg in bus:
-        if msg.arbitration_id == 0x0f0a4083:
-          multiplier = 4
-          topic = 'power'
-        elif msg.arbitration_id == 0x0f0a0083:
-          multiplier = 16
-          topic = 'current'
-        elif msg.arbitration_id == 0x0f09c083:
-          multiplier = 256
-          topic = 'voltage'
-        elif msg.arbitration_id == 0x0f090083:
-          multiplier = 64
-          topic = 'freq'
+      # wait at most 1 s for an answer: the inverter is silent in the dark, and without a timeout
+      # the loop would hang until some other device sends a frame
+      msg = bus.recv(timeout=1.0)
+      if msg is None:
+        continue
 
-        if len(topic)==0 or len(msg.data)<2:
-          break
+      if msg.arbitration_id == 0x0f0a4083:
+        multiplier = 4
+        topic = 'power'
+      elif msg.arbitration_id == 0x0f0a0083:
+        multiplier = 16
+        topic = 'current'
+      elif msg.arbitration_id == 0x0f09c083:
+        multiplier = 256
+        topic = 'voltage'
+      elif msg.arbitration_id == 0x0f090083:
+        multiplier = 64
+        topic = 'freq'
 
-        data = bytearray(msg.data)
-        # to little endian
-        data[0], data[1] = data[1], data[0]
+      if len(topic)==0 or len(msg.data)<2:
+        continue
 
-        dataBin = data[0]<<8 | data[1]
+      data = bytearray(msg.data)
+      # to little endian
+      data[0], data[1] = data[1], data[0]
 
-        if dataBin&0x8000>0:
-          dataBin = ((~dataBin) & 0x7fff) + 1
-          data = -(dataBin/0x2000) * multiplier
-        else:
-          dataBin = dataBin & 0x7fff
-          data = (dataBin/0x2000) * multiplier
+      dataBin = data[0]<<8 | data[1]
 
-        client.publish(Topics[topic],f'{data}')
-        break
+      if dataBin&0x8000>0:
+        dataBin = ((~dataBin) & 0x7fff) + 1
+        data = -(dataBin/0x2000) * multiplier
+      else:
+        dataBin = dataBin & 0x7fff
+        data = (dataBin/0x2000) * multiplier
+
+      client.publish(Topics[topic],f'{data}')
 except Exception as e:
   logging.error("Error: ", exc_info=e)
 finally:
